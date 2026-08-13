@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="my">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Movie Recap AI</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="wrap">
+  <div class="brand">🎬</div>
+  <h1>Movie Recap AI</h1>
+  <p class="sub">Movie တင်လိုက်ရုံနဲ့ မြန်မာ Recap Voice + Subtitle Video ထုတ်ပါ</p>
+
+  <section class="card">
+    <label class="drop" id="drop">
+      <input id="video" type="file" accept="video/*">
+      <div class="big">📤</div>
+      <b>Movie / Video ထည့်ပါ</b>
+      <small>MP4, MOV, MKV, WEBM • Max 2GB</small>
+      <span id="name"></span>
+    </label>
+
+    <label class="label">Recap Style</label>
+    <select id="style">
+      <option value="cinematic">🎬 Cinematic</option>
+      <option value="dramatic">🔥 Dramatic</option>
+      <option value="simple">📝 ရိုးရိုးရှင်းရှင်း</option>
+      <option value="shorts">📱 TikTok / Shorts</option>
+    </select>
+
+    <button id="go">🚀 Generate Burmese Recap</button>
+
+    <div class="progress"><div id="bar"></div></div>
+    <p id="status"></p>
+
+    <a id="download" class="download" hidden>⬇️ Final MP4 Download</a>
+
+    <details id="scriptBox" hidden>
+      <summary>📝 Generated Burmese Script</summary>
+      <pre id="script"></pre>
+    </details>
+  </section>
+
+  <div class="grid">
+    <div>🎬<small>Analyze</small></div>
+    <div>🇲🇲<small>Myanmar Script</small></div>
+    <div>🗣️<small>AI Voice</small></div>
+    <div>💬<small>Subtitle</small></div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+$("video").onchange = () => {
+  $("name").textContent = $("video").files[0]?.name || "";
+};
+$("go").onclick = async () => {
+  const f = $("video").files[0];
+  if (!f) return alert("Video အရင်ရွေးပါ");
+  $("go").disabled = true;
+  $("download").hidden = true;
+  $("scriptBox").hidden = true;
+  $("status").textContent = "📤 Upload လုပ်နေပါတယ်…";
+  $("bar").style.width = "5%";
+  try {
+    const fd = new FormData(); fd.append("video", f);
+    const u = await fetch("/api/upload",{method:"POST",body:fd});
+    const ud = await u.json();
+    if (!u.ok) throw new Error(ud.error);
+    const g = await fetch("/api/generate",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({job_id:ud.job_id,style:$("style").value})
+    });
+    const gd = await g.json();
+    if (!g.ok) throw new Error(gd.error);
+    poll(ud.job_id);
+  } catch(e) {
+    $("status").textContent = "❌ " + e.message;
+    $("go").disabled = false;
+  }
+};
+async function poll(id){
+  const r = await fetch("/api/status/"+id); const d = await r.json();
+  $("bar").style.width = (d.progress||0)+"%";
+  $("status").textContent = d.message || "";
+  if(d.status==="done"){
+    $("download").href=d.video; $("download").hidden=false;
+    $("script").textContent=d.script||""; $("scriptBox").hidden=false;
+    $("go").disabled=false; return;
+  }
+  if(d.status==="error"){
+    $("status").textContent="❌ "+d.message; $("go").disabled=false; return;
+  }
+  setTimeout(()=>poll(id),2000);
+}
+</script>
+</body>
+</html>
